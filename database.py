@@ -75,7 +75,7 @@ def registrar_consumo(nome, qtd, tipo_dia, funcionario, data=None, comprovante=N
     cursor = conn.cursor()
     # 1. Subtrai do estoque
     cursor.execute('UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE nome = ?', (qtd, nome))
-    # 2. Salva no histórico para o cálculo das médias futuras[cite: 7
+    # 2. Salva no histórico para o cálculo das médias futuras[cite: 
     cursor.execute('''
         INSERT INTO historico_gastos (produto_id, data, quantidade, tipo_dia, preco_vendido, funcionario, comprovante)
         SELECT id, ?, ?, ?, preco_venda, ?, ? FROM produtos WHERE nome = ?
