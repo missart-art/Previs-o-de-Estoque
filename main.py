@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import init_db, upsert_produto, adicionar_estoque, registrar_consumo, get_dados_inventario
 from logic import simular_duracao, get_tipo_dia
 import os
@@ -163,7 +163,7 @@ with tab_gasto:
             
             if st.form_submit_button("🚀 Registrar Gasto"):
                 tipo = get_tipo_dia(data_consumo)
-                data_completa = datetime.combine(data_consumo, datetime.now().time()).strftime("%Y-%m-%d %H:%M:%S")
+                data_completa = datetime.combine(data_consumo, (datetime.now() - timedelta(hours=3)).time()).strftime("%Y-%m-%d %H:%M:%S")
                 # O último 'None' garante que nada de foto seja enviado
                 registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa, None)
                 
