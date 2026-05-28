@@ -5,14 +5,21 @@ from database import init_db, upsert_produto, adicionar_estoque, registrar_consu
 from logic import simular_duracao, get_tipo_dia
 import os
 import time
+import tempfile
+
+# Cria o caminho seguro para a pasta temporária do servidor
+PASTA_TEMP = os.path.join(tempfile.gettempdir(), "hostel_comprovantes")
 
 def limpar_temp():
-    if not os.path.exists("temp"): os.makedirs("temp")
+    if not os.path.exists(PASTA_TEMP): 
+        os.makedirs(PASTA_TEMP, exist_ok=True)
     agora = time.time()
-    for f in os.listdir("temp"):
-        caminho = os.path.join("temp", f)
-        # Apaga se for mais velho que 30 dias (30 * 86400 segundos)
-        if os.stat(caminho).st_mtime < agora - 30 * 86400: os.remove(caminho)
+    for f in os.listdir(PASTA_TEMP):
+        caminho = os.path.join(PASTA_TEMP, f)
+        # Apaga se for arquivo e mais velho que 30 dias
+        if os.path.isfile(caminho) and os.stat(caminho).st_mtime < agora - 30 * 86400: 
+            try: os.remove(caminho)
+            except: pass
 
 limpar_temp()
 # Valores padrão caso o arquivo não exista
@@ -89,9 +96,11 @@ with tab_inventario:
                 status = "✅ EM DIA"
                 
             item_tabela = {
+                "ID": p_id,
                 "Produto": nome,
                 "Estoque Atual": atual,
-                "Preço de Venda (R$)": f"R${preco:.2f}",
+                "Estoque Mínimo": minimo,
+                "Preço de Venda (R$)": preco,
                 "Status": status
             }
             
@@ -114,29 +123,36 @@ with tab_inventario:
                 "Status": st.column_config.TextColumn("Status", disabled=True),
                 "Duração Est. (Dias)": st.column_config.TextColumn("Duração Est. (Dias)", disabled=True),
                 "Data Estimada": st.column_config.TextColumn("Data Estimada", disabled=True),
+                
+                # Travas para não aceitar valores nulos (células vazias)
+                "Produto": st.column_config.TextColumn(required=True),
+                "Estoque Atual": st.column_config.NumberColumn(required=True),
+                "Preço de Venda (R$)": st.column_config.NumberColumn(required=True),
             }
         )
         
         # Botão para processar e salvar apenas as linhas modificadas
+        # Botão para processar e salvar apenas as linhas modificadas
         if st.button("💾 Salvar Alterações da Tabela"):
             from database import atualizar_produto_pela_tabela
             
-            # O Streamlit guarda em 'edited_rows' as linhas alteradas no formato {indice_linha: {coluna: novo_valor}}
             alteracoes = st.session_state.editor_estoque.get("edited_rows", {})
             
             if alteracoes:
                 for idx_linha, mudancas in alteracoes.items():
-                    # Recupera a linha original correspondente do DataFrame
-                    linha_original = df_inv.iloc[idx_linha]
+                    # Garante que o índice é lido corretamente
+                    idx_linha = int(idx_linha)
                     
-                    # Se o usuário não alterou o campo, mantém o valor original daquela linha
-                    p_id = int(linha_original["ID"])
-                    novo_nome = mudancas.get("Produto", linha_original["Produto"])
-                    novo_estoque = float(mudancas.get("Estoque Atual", linha_original["Estoque Atual"]))
-                    novo_preco = float(mudancas.get("Preço de Venda (R$)", linha_original["Preço de Venda (R$)"]))
+                    # Pega a linha completa já com as edições feitas pelo usuário
+                    linha_nova = df_editado.iloc[idx_linha]
                     
-                    # Salva direto no banco
-                    atualizar_produto_pela_tabela(p_id, novo_nome, novo_estoque, novo_preco)
+                    p_id = int(linha_nova["ID"])
+                    novo_nome = str(linha_nova["Produto"])
+                    novo_estoque = float(linha_nova["Estoque Atual"])
+                    novo_minimo = float(linha_nova["Estoque Mínimo"])
+                    novo_preco = float(linha_nova["Preço de Venda (R$)"])
+                    
+                    atualizar_produto_pela_tabela(p_id, novo_nome, novo_estoque, novo_minimo, novo_preco)
                 
                 st.success("Alterações salvas com sucesso!")
                 st.rerun()
@@ -165,7 +181,7 @@ with tab_gasto:
             if st.form_submit_button("🚀 Registrar Gasto"):
                 caminho_foto = None
                 if foto:
-                    caminho_foto = f"temp/comp_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+                    caminho_foto = os.path.join(PASTA_TEMP, f"comp_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg")
                     with open(caminho_foto, "wb") as f: f.write(foto.getbuffer())
 
                 tipo = get_tipo_dia(data_consumo)

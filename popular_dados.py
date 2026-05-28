@@ -5,22 +5,16 @@ import os
 from database import init_db, get_connection
 
 def popular_dados():
-    # 1. Garante que as tabelas existam e tenham as colunas novas
     init_db()
     
     conn = get_connection()
     cursor = conn.cursor()
 
-    print("Limpando banco de dados...")
     cursor.execute("DELETE FROM historico_gastos")
     cursor.execute("DELETE FROM produtos")
-    
-    # Resetar o auto-incremento (opcional, mas deixa os IDs limpos)
     cursor.execute("DELETE FROM sqlite_sequence WHERE name='produtos'")
     cursor.execute("DELETE FROM sqlite_sequence WHERE name='historico_gastos'")
     
-    # 2. Criar Produtos com Preços Fictícios
-    print("Criando produtos...")
     produtos_mock = [
         ("Cerveja Heineken 330ml", 15.00, 120, 20),
         ("Água Mineral 500ml", 5.00, 50, 10),
@@ -37,23 +31,19 @@ def popular_dados():
     
     conn.commit()
 
-    # Puxar os IDs criados para gerar o histórico
     cursor.execute("SELECT id, preco_venda FROM produtos")
     produtos_ids = cursor.fetchall()
 
-    # 3. Gerar Histórico de Vendas (Últimos 30 dias)
-    print("Gerando histórico de vendas...")
     funcionarios = ["João", "Maria", "Carlos", "Ana"]
-    tipos_dia = ["util", "util", "util", "pico", "pico"] # Mais peso para dia útil na simulação
+    tipos_dia = ["util", "util", "util", "pico", "pico"] 
 
     historico_dados = []
     
-    for _ in range(150): # 150 vendas aleatórias
+    for i in range(150): 
         prod = random.choice(produtos_ids)
         prod_id = prod[0]
-        preco_na_epoca = prod[1] # Pega o preço de venda para carimbar
+        preco_na_epoca = prod[1] 
         
-        # Simula uma pequena inflação (20% das vezes o produto foi vendido mais barato no passado)
         if random.random() < 0.2:
             preco_na_epoca = round(preco_na_epoca * 0.8, 2)
             
@@ -61,16 +51,20 @@ def popular_dados():
         func = random.choice(funcionarios)
         tipo = random.choice(tipos_dia)
         
-        # Gera uma data aleatória nos últimos 30 dias
         dias_atras = random.randint(0, 30)
-        data_venda = (datetime.now() - timedelta(days=dias_atras)).strftime("%Y-%m-%d")
+        horas_atras = random.randint(0, 23)
+        minutos_atras = random.randint(0, 59)
+        data_venda = (datetime.now() - timedelta(days=dias_atras, hours=horas_atras, minutes=minutos_atras)).strftime("%Y-%m-%d %H:%M:%S")
         
-        historico_dados.append((prod_id, data_venda, qtd, tipo, preco_na_epoca, func))
+        comprovante = None
+        if random.random() < 0.3:
+            comprovante = f"temp/comp_{datetime.now().strftime('%Y%m%d%H%M%S')}_{i}.jpg"
 
-    # Inserção em lote para ser rápido
+        historico_dados.append((prod_id, data_venda, qtd, tipo, preco_na_epoca, func, comprovante))
+
     cursor.executemany('''
-        INSERT INTO historico_gastos (produto_id, data, quantidade, tipo_dia, preco_vendido, funcionario)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO historico_gastos (produto_id, data, quantidade, tipo_dia, preco_vendido, funcionario, comprovante)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', historico_dados)
 
     conn.commit()

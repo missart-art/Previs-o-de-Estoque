@@ -138,15 +138,15 @@ def get_faturamento(data_inicio):
     df = pd.read_sql_query(query, conn, params=[data_inicio])
     conn.close()
     return df
-
-def atualizar_produto_pela_tabela(id_produto, nome, estoque, preco):
+    
+def atualizar_produto_pela_tabela(id_produto, nome, estoque, minimo, preco):
     """Atualiza todos os dados de um produto específico através do ID."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE produtos 
-        SET nome = ?, estoque_atual = ?, preco_venda = ?
+        SET nome = ?, estoque_atual = ?, estoque_minimo = ?, preco_venda = ?
         WHERE id = ?
-    ''', (nome, estoque, preco, id_produto))
+    ''', (nome, estoque, minimo, preco, id_produto))
     conn.commit()
     conn.close()
