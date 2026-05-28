@@ -103,9 +103,8 @@ def get_historico_gastos(termo=""):
                h.funcionario AS Vendedor,
                p.nome AS Produto, 
                CAST(SUM(h.quantidade) AS INTEGER) AS Qtd, 
-               printf('R$ %.2f', SUM(h.quantidade * h.preco_vendido)) AS [Valor Total (R$)],
-               h.comprovante AS Comprovante
-
+               printf('R$ %.2f', SUM(h.quantidade * h.preco_vendido)) AS [Valor Total (R$)]
+               
         FROM historico_gastos h
         JOIN produtos p ON h.produto_id = p.id
     '''
@@ -114,7 +113,7 @@ def get_historico_gastos(termo=""):
         query += " WHERE p.nome LIKE ? OR h.data LIKE ?"
         params.extend([f'%{termo}%', f'%{termo}%'])
         
-    query += " GROUP BY h.data, p.nome, h.preco_vendido, h.funcionario, h.comprovante ORDER BY h.data DESC"    
+    query += " GROUP BY h.data, p.nome, h.preco_vendido, h.funcionario ORDER BY h.data DESC"    
     
     import pandas as pd
     df = pd.read_sql_query(query, conn, params=params)
@@ -138,7 +137,7 @@ def get_faturamento(data_inicio):
     df = pd.read_sql_query(query, conn, params=[data_inicio])
     conn.close()
     return df
-    
+
 def atualizar_produto_pela_tabela(id_produto, nome, estoque, minimo, preco):
     """Atualiza todos os dados de um produto específico através do ID."""
     conn = get_connection()

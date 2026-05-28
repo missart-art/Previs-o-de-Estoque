@@ -8,20 +8,6 @@ import time
 import tempfile
 
 # Cria o caminho seguro para a pasta temporária do servidor
-PASTA_TEMP = os.path.join(tempfile.gettempdir(), "hostel_comprovantes")
-
-def limpar_temp():
-    if not os.path.exists(PASTA_TEMP): 
-        os.makedirs(PASTA_TEMP, exist_ok=True)
-    agora = time.time()
-    for f in os.listdir(PASTA_TEMP):
-        caminho = os.path.join(PASTA_TEMP, f)
-        # Apaga se for arquivo e mais velho que 30 dias
-        if os.path.isfile(caminho) and os.stat(caminho).st_mtime < agora - 30 * 86400: 
-            try: os.remove(caminho)
-            except: pass
-
-limpar_temp()
 # Valores padrão caso o arquivo não exista
 modo_previsao = 1
 modo_financeiro = 1
@@ -174,19 +160,12 @@ with tab_gasto:
             qtd_consumida = col2.number_input("Quantidade", min_value=1, step=1)
             data_consumo = col3.date_input("Data", datetime.now())
             funcionario = st.text_input("Vendedor/Funcionário", placeholder="Nome")
-            foto = None
-            with st.expander("📸 Clique aqui para tirar foto do comprovante"):
-                foto = st.camera_input("Câmera")
             
             if st.form_submit_button("🚀 Registrar Gasto"):
-                caminho_foto = None
-                if foto:
-                    caminho_foto = os.path.join(PASTA_TEMP, f"comp_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg")
-                    with open(caminho_foto, "wb") as f: f.write(foto.getbuffer())
-
                 tipo = get_tipo_dia(data_consumo)
                 data_completa = datetime.combine(data_consumo, datetime.now().time()).strftime("%Y-%m-%d %H:%M:%S")
-                registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa, caminho_foto)
+                # O último 'None' garante que nada de foto seja enviado
+                registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa, None)
                 
                 st.toast(f"Consumo de {produto_sel} registrado!")
                 st.rerun()
@@ -211,18 +190,7 @@ with tab_gasto:
             st.dataframe(df_hist, use_container_width=True, hide_index=True)
             
             # Botão para abrir as fotos
-            com_foto = df_hist[df_hist["Comprovante"].notna()]
-            if not com_foto.empty:
-                st.divider()
-                st.write("### 📸 Ver Comprovantes")
-                venda_sel = st.selectbox("Selecione o ID da venda:", com_foto["ID"].astype(str) + " - " + com_foto["Produto"])
-                
-                if venda_sel:
-                    id_sel = int(venda_sel.split(" - ")[0])
-                    path_img = com_foto[com_foto["ID"] == id_sel]["Comprovante"].values[0]
-                    if os.path.exists(path_img):
-                        st.image(path_img, width=400)
-
+            
 # --- ABA 4: FINANCEIRO ---
 if modo_financeiro == 1:
     with abas[3]:
