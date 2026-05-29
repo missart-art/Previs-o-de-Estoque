@@ -71,7 +71,7 @@ with tab_inventario:
         st.info("Nenhum produto cadastrado no inventário.")
     else:
         lista_final = []
-        for p_id, nome, atual, minimo, preco in dados:
+        for p_id, nome, atual, minimo, preco, geral in dados:
             dias, previsao = simular_duracao(nome, atual)
             
             if atual <= 0:
@@ -84,6 +84,7 @@ with tab_inventario:
             item_tabela = {
                 "ID": p_id,
                 "Produto": nome,
+                "Estoque Geral": geral,  # <--- ADICIONE ISTO
                 "Estoque Atual": atual,
                 "Estoque Mínimo": minimo,
                 "Preço de Venda (R$)": preco,
@@ -114,6 +115,7 @@ with tab_inventario:
                 "Produto": st.column_config.TextColumn(required=True),
                 "Estoque Atual": st.column_config.NumberColumn(required=True),
                 "Preço de Venda (R$)": st.column_config.NumberColumn(required=True),
+                "Estoque Geral": st.column_config.NumberColumn(required=True), # <--- ADICIONE ISTO
             }
         )
         
@@ -134,11 +136,12 @@ with tab_inventario:
                     
                     p_id = int(linha_nova["ID"])
                     novo_nome = str(linha_nova["Produto"])
+                    novo_geral = float(linha_nova["Estoque Geral"])
                     novo_estoque = float(linha_nova["Estoque Atual"])
                     novo_minimo = float(linha_nova["Estoque Mínimo"])
                     novo_preco = float(linha_nova["Preço de Venda (R$)"])
                     
-                    atualizar_produto_pela_tabela(p_id, novo_nome, novo_estoque, novo_minimo, novo_preco)
+                    atualizar_produto_pela_tabela(p_id, novo_nome, novo_estoque, novo_minimo, novo_preco, novo_geral)
                 
                 st.success("Alterações salvas com sucesso!")
                 st.rerun()
@@ -165,7 +168,7 @@ with tab_gasto:
                 tipo = get_tipo_dia(data_consumo)
                 data_completa = datetime.combine(data_consumo, (datetime.now() - timedelta(hours=3)).time()).strftime("%Y-%m-%d %H:%M:%S")
                 # O último 'None' garante que nada de foto seja enviado
-                registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa, None)
+                registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa)
                 
                 st.toast(f"Consumo de {produto_sel} registrado!")
                 st.rerun()
