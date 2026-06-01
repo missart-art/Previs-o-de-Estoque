@@ -101,13 +101,16 @@ def get_dados_inventario():
 
 def get_historico_gastos(termo=""):
     conn = get_connection()
+    # Retiramos o agrupamento matemático para espelhar a verdade do banco
     query = '''
         SELECT 
+               h.id AS "ID_Transacao",
+               p.id AS "ID_Produto",
                h.data AS "Data", 
                h.funcionario AS "Vendedor",
                p.nome AS "Produto", 
-               CAST(SUM(h.quantidade) AS INTEGER) AS "Qtd", 
-               TO_CHAR(SUM(h.quantidade * h.preco_vendido), 'FM"R$ "999999990.00') AS "Valor Total (R$)"
+               h.quantidade AS "Qtd", 
+               h.preco_vendido AS "Preço (R$)"
         FROM historico_gastos h
         JOIN produtos p ON h.produto_id = p.id
     '''
@@ -116,11 +119,37 @@ def get_historico_gastos(termo=""):
         query += " WHERE p.nome ILIKE %s OR h.data ILIKE %s"
         params.extend([f'%{termo}%', f'%{termo}%'])
         
-    query += ' GROUP BY h.data, p.nome, h.preco_vendido, h.funcionario ORDER BY h.data DESC'
+    query += " ORDER BY h.data DESC"
     
     df = pd.read_sql_query(query, conn, params=params)
-    
+
     return df
+
+def atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor):
+    """Motor de equilíbrio: Atualiza o registro e compensa o inventário automaticamente."""
+    delta = nova_qtd - qtd_antiga
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # 1. Reescreve o passado
+    cursor.execute('''
+        UPDATE historico_gastos 
+        SET quantidade = %s, preco_vendido = %s, funcionario = %s
+        WHERE id = %s
+    ''', (nova_qtd, novo_preco, novo_vendedor, id_transacao))
+    
+    # 2. Reajusta a física do estoque
+    # Se delta for positivo (vendeu mais), subtrai mais do estoque.
+    # Se delta for negativo (vendeu menos/estorno), a subtração de um negativo soma ao estoque.
+    cursor.execute('''
+        UPDATE produtos 
+        SET estoque_atual = estoque_atual - %s, 
+            estoque_geral = estoque_geral - %s 
+        WHERE id = %s
+    ''', (delta, delta, id_produto))
+    
+    conn.commit()
 
 def get_faturamento(data_inicio):
     conn = get_connection()

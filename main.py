@@ -157,6 +157,10 @@ with tab_gasto:
         st.warning("Cadastre produtos na aba de Reposição primeiro.")
     else:
         # --- FORMULÁRIO DE REGISTRO ---
+        # Precisamos puxar os dados completos para verificar o estoque atual
+        dados_inventario = get_dados_inventario()
+        produtos_cadastrados = [p[1] for p in dados_inventario]
+
         with st.form("form_consumo"):
             col1, col2 = st.columns(2)
             produto_sel = col1.selectbox("Produto", produtos_cadastrados)
@@ -165,16 +169,29 @@ with tab_gasto:
             funcionario = st.text_input("Vendedor/Funcionário", placeholder="Nome")
             
             if st.form_submit_button("🚀 Registrar Gasto"):
-                # Calcula a data e hora (já com -3h) no exato milissegundo do clique
-                agora_br = datetime.now()
                 
-                tipo = get_tipo_dia(agora_br.date())
-                data_completa = agora_br.strftime("%Y-%m-%d %H:%M:%S")
+                # --- TRAVA DE SEGURANÇA DO ESTOQUE ---
+                estoque_atual = 0
+                for p in dados_inventario:
+                    if p[1] == produto_sel:
+                        estoque_atual = p[2] # Pega o valor do estoque_atual
+                        break
                 
-                registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa)
-                
-                st.toast(f"Consumo de {produto_sel} registrado!")
-                st.rerun()
+                if estoque_atual <= 0:
+                    st.error("Produto sem estoque!")
+                elif estoque_atual < qtd_consumida:
+                    st.error(f"Estoque insuficiente! Você tem apenas {estoque_atual} de {produto_sel}.")
+                # -------------------------------------
+                else:
+                    # Se passou na verificação, segue com a venda normalmente
+                    agora_br = datetime.now() - timedelta(hours=3)
+                    tipo = get_tipo_dia(agora_br.date())
+                    data_completa = agora_br.strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa)
+                    
+                    st.toast(f"Consumo de {produto_sel} registrado!")
+                    st.rerun()
 
         st.divider() # Separa o formulário do histórico
 
@@ -193,9 +210,51 @@ with tab_gasto:
         else:
             # Mostra a tabela de histórico[cite: 8]
             # Mostra a tabela (o caminho da foto aparece na coluna 'Comprovante')
-            st.dataframe(df_hist, use_container_width=True, hide_index=True)
+            # Editor Interativo Blindado
+            df_hist_editado = st.data_editor(
+                df_hist, 
+                use_container_width=True, 
+                hide_index=True,
+                key="editor_historico",
+                column_config={
+                    "ID_Transacao": None, # Esconde a engrenagem do usuário final
+                    "ID_Produto": None,
+                    "Data": st.column_config.TextColumn(disabled=True),
+                    "Produto": st.column_config.TextColumn(disabled=True),
+                    "Qtd": st.column_config.NumberColumn(required=True, min_value=0),
+                    "Preço (R$)": st.column_config.NumberColumn(required=True),
+                    "Vendedor": st.column_config.TextColumn(required=True)
+                }
+            )
             
-            # Botão para abrir as fotos
+            if st.button("💾 Salvar Correções do Histórico"):
+                from database import atualizar_historico_com_delta
+                
+                alteracoes = st.session_state.editor_historico.get("edited_rows", {})
+                
+                if alteracoes:
+                    for idx_linha, mudancas in alteracoes.items():
+                        idx_linha = int(idx_linha)
+                        
+                        linha_original = df_hist.iloc[idx_linha]
+                        linha_nova = df_hist_editado.iloc[idx_linha]
+                        
+                        id_transacao = int(linha_original["ID_Transacao"])
+                        id_produto = int(linha_original["ID_Produto"])
+                        qtd_antiga = float(linha_original["Qtd"])
+                        
+                        nova_qtd = float(linha_nova["Qtd"])
+                        novo_preco = float(linha_nova["Preço (R$)"])
+                        novo_vendedor = str(linha_nova["Vendedor"])
+                        
+                        atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor)
+                    
+                    st.success("Histórico domado e estoques recalculados automaticamente!")
+                    st.rerun()
+                else:
+                    st.info("Nenhuma modificação detectada.")
+                
+                # Botão para abrir as fotos
             
 # --- ABA 4: FINANCEIRO ---
 if modo_financeiro == 1:
