@@ -158,16 +158,19 @@ with tab_gasto:
     else:
         # --- FORMULÁRIO DE REGISTRO ---
         with st.form("form_consumo"):
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             produto_sel = col1.selectbox("Produto", produtos_cadastrados)
             qtd_consumida = col2.number_input("Quantidade", min_value=1, step=1)
-            data_consumo = col3.date_input("Data", datetime.now())
+            
             funcionario = st.text_input("Vendedor/Funcionário", placeholder="Nome")
             
             if st.form_submit_button("🚀 Registrar Gasto"):
-                tipo = get_tipo_dia(data_consumo)
-                data_completa = datetime.combine(data_consumo, (datetime.now() - timedelta(hours=3)).time()).strftime("%Y-%m-%d %H:%M:%S")
-                # O último 'None' garante que nada de foto seja enviado
+                # Calcula a data e hora (já com -3h) no exato milissegundo do clique
+                agora_br = datetime.now()
+                
+                tipo = get_tipo_dia(agora_br.date())
+                data_completa = agora_br.strftime("%Y-%m-%d %H:%M:%S")
+                
                 registrar_consumo(produto_sel, qtd_consumida, tipo, funcionario, data_completa)
                 
                 st.toast(f"Consumo de {produto_sel} registrado!")
