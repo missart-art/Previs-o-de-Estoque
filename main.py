@@ -272,7 +272,7 @@ if modo_financeiro == 1:
         else:
             dias_voltar = 30
             
-        data_filtro = (datetime.now() - timedelta(days=dias_voltar)).strftime("%Y-%m-%d")
+        data_filtro = (datetime.now() - timedelta(days=dias_voltar, hours=3)).strftime("%Y-%m-%d")
         
         # Busca os dados
         from database import get_faturamento
