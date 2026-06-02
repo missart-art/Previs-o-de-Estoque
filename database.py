@@ -125,29 +125,43 @@ def get_historico_gastos(termo=""):
 
     return df
 
-def atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor):
-    """Motor de equilíbrio: Atualiza o registro e compensa o inventário automaticamente."""
-    delta = nova_qtd - qtd_antiga
-    
+def atualizar_historico_com_delta(id_transacao, id_produto_antigo, nova_qtd, qtd_antiga, novo_preco, novo_vendedor, nome_novo_produto):
     conn = get_connection()
     cursor = conn.cursor()
     
-    # 1. Reescreve o passado
+    # 1. Traduz o nome visual para o ID real e já puxa o preço de tabela dele
+    cursor.execute('SELECT id, preco_venda FROM produtos WHERE nome = %s', (nome_novo_produto,))
+    dados_novo_produto = cursor.fetchone()
+    id_produto_novo = dados_novo_produto[0]
+    preco_oficial_novo = dados_novo_produto[1]
+    
+    # Se o sistema detectar que o produto foi trocado, ele ignora o preço que ficou na tela e força o preço oficial
+    if id_produto_antigo != id_produto_novo:
+        novo_preco = preco_oficial_novo
+    
+    # 2. Lógica de reajuste físico
+    if id_produto_antigo == id_produto_novo:
+        # Se for o mesmo produto, faz a diferença simples
+        delta = nova_qtd - qtd_antiga
+        cursor.execute('''
+            UPDATE produtos SET estoque_atual = estoque_atual - %s, estoque_geral = estoque_geral - %s WHERE id = %s
+        ''', (delta, delta, id_produto_antigo))
+    else:
+        # Se trocou de produto: Devolve tudo pro antigo e saca tudo do novo
+        cursor.execute('''
+            UPDATE produtos SET estoque_atual = estoque_atual + %s, estoque_geral = estoque_geral + %s WHERE id = %s
+        ''', (qtd_antiga, qtd_antiga, id_produto_antigo))
+        
+        cursor.execute('''
+            UPDATE produtos SET estoque_atual = estoque_atual - %s, estoque_geral = estoque_geral - %s WHERE id = %s
+        ''', (nova_qtd, nova_qtd, id_produto_novo))
+        
+    # 3. Reescreve o passado (agora atualizando também o produto_id)
     cursor.execute('''
         UPDATE historico_gastos 
-        SET quantidade = %s, preco_vendido = %s, funcionario = %s
+        SET produto_id = %s, quantidade = %s, preco_vendido = %s, funcionario = %s
         WHERE id = %s
-    ''', (nova_qtd, novo_preco, novo_vendedor, id_transacao))
-    
-    # 2. Reajusta a física do estoque
-    # Se delta for positivo (vendeu mais), subtrai mais do estoque.
-    # Se delta for negativo (vendeu menos/estorno), a subtração de um negativo soma ao estoque.
-    cursor.execute('''
-        UPDATE produtos 
-        SET estoque_atual = estoque_atual - %s, 
-            estoque_geral = estoque_geral - %s 
-        WHERE id = %s
-    ''', (delta, delta, id_produto))
+    ''', (id_produto_novo, nova_qtd, novo_preco, novo_vendedor, id_transacao))
     
     conn.commit()
 

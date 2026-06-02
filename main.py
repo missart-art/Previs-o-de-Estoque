@@ -211,6 +211,10 @@ with tab_gasto:
             # Mostra a tabela de histórico[cite: 8]
             # Mostra a tabela (o caminho da foto aparece na coluna 'Comprovante')
             # Editor Interativo Blindado
+            # Busca a lista atualizada direto do banco
+            dados_inventario = get_dados_inventario()
+            produtos_cadastrados = [p[1] for p in dados_inventario]
+            
             df_hist_editado = st.data_editor(
                 df_hist, 
                 use_container_width=True, 
@@ -220,7 +224,7 @@ with tab_gasto:
                     "ID_Transacao": None, # Esconde a engrenagem do usuário final
                     "ID_Produto": None,
                     "Data": st.column_config.TextColumn(disabled=True),
-                    "Produto": st.column_config.TextColumn(disabled=True),
+                    "Produto": st.column_config.SelectboxColumn("Produto", options=produtos_cadastrados, required=True),
                     "Qtd": st.column_config.NumberColumn(required=True, min_value=0),
                     "Preço (R$)": st.column_config.NumberColumn(required=True),
                     "Vendedor": st.column_config.TextColumn(required=True)
@@ -246,8 +250,9 @@ with tab_gasto:
                         nova_qtd = float(linha_nova["Qtd"])
                         novo_preco = float(linha_nova["Preço (R$)"])
                         novo_vendedor = str(linha_nova["Vendedor"])
+                        novo_produto_nome = str(linha_nova["Produto"])
                         
-                        atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor)
+                        atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor, novo_produto_nome)
                     
                     st.success("Histórico domado e estoques recalculados automaticamente!")
                     st.rerun()
