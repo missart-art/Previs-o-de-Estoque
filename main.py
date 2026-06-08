@@ -34,27 +34,51 @@ if modo_financeiro == 1:
 abas = st.tabs(abas_nomes)
 tab_reposicao, tab_inventario, tab_gasto = abas[0], abas[1], abas[2]
 
-# --- ABA 1: REPOSIÇÃO (Entrada de Mercadoria)[cite: 8] ---
+# --- ABA 1: REPOSIÇÃO (Entrada de Mercadoria) ---
 with tab_reposicao:
-    st.subheader("Adicionar ou Atualizar Produto")
+    # Coleta os produtos atuais para alimentar o primeiro formulário
+    dados_inventario = get_dados_inventario()
+    produtos_existentes = [p[1] for p in dados_inventario]
+
+    # --- FORMULÁRIO 1: REPOSIÇÃO DE ESTOQUE EXISTENTE ---
+    st.subheader("📦 Reposição de Estoque (Produto já Cadastrado)")
+    if not produtos_existentes:
+        st.info("Nenhum produto cadastrado no sistema ainda. Use o formulário abaixo para adicionar o primeiro.")
+    else:
+        with st.form("form_reposicao_existente"):
+            col1, col2 = st.columns(2)
+            produto_sel = col1.selectbox("Selecione o Produto", produtos_existentes)
+            qtd_reposicao = col2.number_input("Quantidade para Adicionar", min_value=1, step=1)
+            
+            if st.form_submit_button("Confirmar Aumento de Estoque"):
+                adicionar_estoque(produto_sel, qtd_reposicao)
+                st.success(f"Estoque de '{produto_sel}' aumentado em {qtd_reposicao} unidades!")
+                time.sleep(1)
+                st.rerun()
+
+    st.divider() # Linha divisória física na interface
+
+    # --- FORMULÁRIO 2: CADASTRO DE NOVO PRODUTO ---
+    st.subheader("➕ Adicionar Novo Produto ao Sistema")
     with st.form("form_entrada"):
         col1, col2 = st.columns(2)
-        nome = col1.text_input("Nome do Produto", placeholder="Ex: Papel Higiênico")
+        nome = col1.text_input("Nome do Novo Produto", placeholder="Ex: Papel Higiênico")
         estoque_min = col2.number_input("Estoque Mínimo (Alerta)", min_value=0, step=1)
         
-        # Injeção do Passo 3: Campo de preço dinâmico
         preco_venda = 0.0
         if modo_financeiro == 1:
             preco_venda = st.number_input("Preço de Venda (R$)", min_value=0.0, step=0.50, format="%.2f")
         
-        quantidade = st.number_input("Quantidade para Adicionar ao Estoque", min_value=0, step=1)
+        quantidade = st.number_input("Quantidade Inicial em Estoque", min_value=0, step=1)
         
-        if st.form_submit_button("Confirmar Entrada"):
+        if st.form_submit_button("Confirmar Cadastro de Produto"):
             if nome:
-                # Passando o preço de venda coletado para a função do banco
+                # Se o nome já existir, o ON CONFLICT do banco protege a integridade
                 upsert_produto(nome, estoque_min, preco_venda)
                 adicionar_estoque(nome, quantidade)
-                st.success(f"Estoque de '{nome}' atualizado com sucesso!")
+                st.success(f"Novo produto '{nome}' cadastrado com sucesso com estoque inicial de {quantidade}!")
+                time.sleep(1)
+                st.rerun()
             else:
                 st.error("Por favor, insira o nome do produto.")
 
@@ -216,6 +240,10 @@ with tab_gasto:
             # Mostra a tabela de histórico[cite: 8]
             # Mostra a tabela (o caminho da foto aparece na coluna 'Comprovante')
             # Editor Interativo Blindado
+
+            # Injeta a coluna de exclusão no início do DataFrame
+            df_hist.insert(0, "🚨 APAGAR REGISTRO 🚨", False)
+
             # Busca a lista atualizada direto do banco
             dados_inventario = get_dados_inventario()
             produtos_cadastrados = [p[1] for p in dados_inventario]
@@ -226,6 +254,7 @@ with tab_gasto:
                 hide_index=True,
                 key="editor_historico",
                 column_config={
+                    "🚨 APAGAR REGISTRO 🚨": st.column_config.CheckboxColumn("Excluir", default=False),
                     "ID_Transacao": None, # Esconde a engrenagem do usuário final
                     "ID_Produto": None,
                     "Data": st.column_config.TextColumn(disabled=True),
@@ -264,7 +293,14 @@ with tab_gasto:
                             novo_vendedor = str(linha_nova["Vendedor"])
                             novo_produto_nome = str(linha_nova["Produto"])
                             
-                            atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor, novo_produto_nome)
+                            # Se o checkbox de excluir foi marcado, faz o estorno. Senão, calcula o delta.
+                            if linha_nova["🚨 APAGAR REGISTRO 🚨"] == True:
+                                from database import deletar_transacao_e_estornar
+                                deletar_transacao_e_estornar(id_transacao, id_produto, qtd_antiga)
+                            else:
+                                atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor, novo_produto_nome)
+                        
+                        
                         
                         
                         st.success("Histórico domado e estoques recalculados automaticamente!")

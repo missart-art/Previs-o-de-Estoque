@@ -190,5 +190,23 @@ def atualizar_produto_pela_tabela(id_produto, nome, estoque_atual, minimo, preco
         WHERE id = %s
     ''', (nome, estoque_atual, minimo, preco, estoque_geral, id_produto))
     conn.commit()
+
+def deletar_transacao_e_estornar(id_transacao, id_produto, quantidade):
+    """Devolve os produtos ao inventário e apaga o registro definitivamente."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # 1. Devolve a mercadoria para a prateleira
+    cursor.execute('''
+        UPDATE produtos 
+        SET estoque_atual = estoque_atual + %s, 
+            estoque_geral = estoque_geral + %s 
+        WHERE id = %s
+    ''', (quantidade, quantidade, id_produto))
+    
+    # 2. Deleta o registro do livro-razão
+    cursor.execute('DELETE FROM historico_gastos WHERE id = %s', (id_transacao,))
+    
+    conn.commit()
     
     
