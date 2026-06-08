@@ -121,32 +121,37 @@ with tab_inventario:
         
         # Botão para processar e salvar apenas as linhas modificadas
         # Botão para processar e salvar apenas as linhas modificadas
-        if st.button("💾 Salvar Alterações da Tabela"):
-            from database import atualizar_produto_pela_tabela
-            
-            alteracoes = st.session_state.editor_estoque.get("edited_rows", {})
-            
-            if alteracoes:
-                for idx_linha, mudancas in alteracoes.items():
-                    # Garante que o índice é lido corretamente
-                    idx_linha = int(idx_linha)
-                    
-                    # Pega a linha completa já com as edições feitas pelo usuário
-                    linha_nova = df_editado.iloc[idx_linha]
-                    
-                    p_id = int(linha_nova["ID"])
-                    novo_nome = str(linha_nova["Produto"])
-                    novo_geral = float(linha_nova["Estoque Geral"])
-                    novo_estoque = float(linha_nova["Estoque Atual"])
-                    novo_minimo = float(linha_nova["Estoque Mínimo"])
-                    novo_preco = float(linha_nova["Preço de Venda (R$)"])
-                    
-                    atualizar_produto_pela_tabela(p_id, novo_nome, novo_estoque, novo_minimo, novo_preco, novo_geral)
-                
-                st.success("Alterações salvas com sucesso!")
-                st.rerun()
+        # Pedágio de Segurança e Botão
+        col_senha, col_btn = st.columns([1, 3], vertical_alignment="bottom")
+        senha_inv = col_senha.text_input("🔑 Senha Admin", type="password", key="senha_inv")
+        
+        if col_btn.button("💾 Salvar Alterações da Tabela", use_container_width=True, type="primary"):
+            if senha_inv != "garden2026":  # <--- Troque "1234" pela sua senha oficial
+                st.error("❌ Acesso negado. Senha incorreta.")
             else:
-                st.info("Nenhuma modificação detectada para salvar.")
+                from database import atualizar_produto_pela_tabela
+                
+                alteracoes = st.session_state.editor_estoque.get("edited_rows", {})
+                
+                if alteracoes:
+                    for idx_linha, mudancas in alteracoes.items():
+                        idx_linha = int(idx_linha)
+                        linha_nova = df_editado.iloc[idx_linha]
+                        
+                        p_id = int(linha_nova["ID"])
+                        novo_nome = str(linha_nova["Produto"])
+                        novo_geral = float(linha_nova["Estoque Geral"])
+                        novo_estoque = float(linha_nova["Estoque Atual"])
+                        novo_minimo = float(linha_nova["Estoque Mínimo"])
+                        novo_preco = float(linha_nova["Preço de Venda (R$)"])
+                        
+                        atualizar_produto_pela_tabela(p_id, novo_nome, novo_estoque, novo_minimo, novo_preco, novo_geral)
+                    
+                    
+                    st.success("Alterações salvas com sucesso!")
+                    st.rerun()
+                else:
+                    st.info("Nenhuma modificação detectada para salvar.")
 
 # --- ABA 3: GASTO DIÁRIO (Registro de Consumo)[cite: 7, 8] ---
 with tab_gasto:
@@ -231,33 +236,41 @@ with tab_gasto:
                 }
             )
             
-            if st.button("💾 Salvar Correções do Histórico"):
-                from database import atualizar_historico_com_delta
-                
-                alteracoes = st.session_state.editor_historico.get("edited_rows", {})
-                
-                if alteracoes:
-                    for idx_linha, mudancas in alteracoes.items():
-                        idx_linha = int(idx_linha)
-                        
-                        linha_original = df_hist.iloc[idx_linha]
-                        linha_nova = df_hist_editado.iloc[idx_linha]
-                        
-                        id_transacao = int(linha_original["ID_Transacao"])
-                        id_produto = int(linha_original["ID_Produto"])
-                        qtd_antiga = float(linha_original["Qtd"])
-                        
-                        nova_qtd = float(linha_nova["Qtd"])
-                        novo_preco = float(linha_nova["Preço (R$)"])
-                        novo_vendedor = str(linha_nova["Vendedor"])
-                        novo_produto_nome = str(linha_nova["Produto"])
-                        
-                        atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor, novo_produto_nome)
-                    
-                    st.success("Histórico domado e estoques recalculados automaticamente!")
-                    st.rerun()
+            # Pedágio de Segurança e Botão
+            col_senha_hist, col_btn_hist = st.columns([1, 3], vertical_alignment="bottom")
+            senha_hist = col_senha_hist.text_input("🔑 Senha Admin", type="password", key="senha_hist")
+
+            if col_btn_hist.button("💾 Salvar Correções do Histórico", use_container_width=True, type="primary"):
+                if senha_hist != "garden2026":  # <--- Troque "1234" pela sua senha oficial
+                    st.error("❌ Acesso negado. Senha incorreta.")
                 else:
-                    st.info("Nenhuma modificação detectada.")
+                    from database import atualizar_historico_com_delta
+                    
+                    alteracoes = st.session_state.editor_historico.get("edited_rows", {})
+                    
+                    if alteracoes:
+                        for idx_linha, mudancas in alteracoes.items():
+                            idx_linha = int(idx_linha)
+                            
+                            linha_original = df_hist.iloc[idx_linha]
+                            linha_nova = df_hist_editado.iloc[idx_linha]
+                            
+                            id_transacao = int(linha_original["ID_Transacao"])
+                            id_produto = int(linha_original["ID_Produto"])
+                            qtd_antiga = float(linha_original["Qtd"])
+                            
+                            nova_qtd = float(linha_nova["Qtd"])
+                            novo_preco = float(linha_nova["Preço (R$)"])
+                            novo_vendedor = str(linha_nova["Vendedor"])
+                            novo_produto_nome = str(linha_nova["Produto"])
+                            
+                            atualizar_historico_com_delta(id_transacao, id_produto, nova_qtd, qtd_antiga, novo_preco, novo_vendedor, novo_produto_nome)
+                        
+                        
+                        st.success("Histórico domado e estoques recalculados automaticamente!")
+                        st.rerun()
+                    else:
+                        st.info("Nenhuma modificação detectada.")
                 
                 # Botão para abrir as fotos
             
